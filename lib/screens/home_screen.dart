@@ -1,6 +1,6 @@
 import 'package:aurora_music_v01/screens/login_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,7 +18,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    user = FirebaseAuth.instance.currentUser;
+    user = Supabase.instance.client.auth.currentUser;  //FirebaseAuth.instance.currentUser;
 
     Future.delayed(const Duration(milliseconds: 1500), () {
       setState(() {
@@ -113,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 alignment: Alignment.bottomCenter,
                 child: ElevatedButton(
                   onPressed: () async {
-                    await FirebaseAuth.instance.signOut();
+                    await Supabase.instance.client.auth.signOut();
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(builder: (context) => LoginPage()),
