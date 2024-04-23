@@ -22,6 +22,7 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final Connectivity _connectivity = Connectivity();
 
+
   @override
   void initState() {
     super.initState();
@@ -207,14 +208,14 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               SizedBox(height: 10),
                               ElevatedButton(
-                                onPressed: () async {
-                                  if (_formKey.currentState!.validate()) {
-                                    if (_error!= null) {
-                                      _showErrorDialog(context, _error!);
-                                      return;
-                                    }
-                                    try {
-                                      final response = await _supabase.auth.signInWithPassword(email: email, password: password);
+  onPressed: () async {
+    if (_formKey.currentState!.validate()) {
+      if (_error!= null) {
+        _showErrorDialog(context, _error!);
+        return;
+      }
+      try {
+        final response = await _supabase.auth.signInWithPassword(email: email, password: password);
                                       if (response.user == null) {
                                         _showErrorDialog(context, 'Invalid email or password');
                                       } else {
