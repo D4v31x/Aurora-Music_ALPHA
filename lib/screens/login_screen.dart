@@ -4,6 +4,10 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'sign_screen.dart';
 import 'home_screen.dart';
 import 'home_screen_ads.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:version/version.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -18,6 +22,7 @@ class _LoginPageState extends State<LoginPage> {
   String? _error;
   late ScrollController _scrollController;
   final emailFocusNode = FocusNode();
+  Version? latestVersion;
 
   final _formKey = GlobalKey<FormState>();
   final Connectivity _connectivity = Connectivity();
@@ -25,6 +30,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
+    checkForNewVersion();
     _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
       setState(() {
         _error = results.contains(ConnectivityResult.none)? 'No internet connection' : null;
@@ -38,6 +44,8 @@ class _LoginPageState extends State<LoginPage> {
       }
     });
   }
+  
+  
 
   Future<void> _resetPassword() async {
     try {
@@ -68,9 +76,75 @@ class _LoginPageState extends State<LoginPage> {
     isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
   }
 
+    Future<void> checkForNewVersion() async {
+    try {
+      final response = await http.get(Uri.parse('https://api.github.com/repos/D4v31x/Aurora-Music_ALPHA_RELEASES/releases/latest'));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final versionString = data['tag_name'];
+        final regex = RegExp(r'^v?(\d+\.\d+\.\d+(-\S+)?)$');
+        final match = regex.firstMatch(versionString);
+        if (match!= null && match.groupCount > 0) {
+          final versionString = match.group(1)!;
+          setState(() {
+            latestVersion = Version.parse(versionString);
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching latest version: $e');
+    }
+  }
+
+  void launchURL(String url) async {
+    if (await canLaunch(url)) {
+      try {
+        await launch(url);
+      } catch (e) {
+        print('Error launching URL: $e');
+      }
+    } else {
+      throw 'Could not launch $url';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
+    final regex = RegExp(r'^v?(\d+\.\d+\.\d+)(-\S+)?$');
+  final match = regex.firstMatch('v0.0.4-alpha');
+  final currentVersion = Version.parse(match!.group(1)!);
+  final isUpdateAvailable = latestVersion != null && latestVersion!.compareTo(currentVersion) > 0;
+
+  if (isUpdateAvailable) {
+    Future.delayed(Duration.zero, () {
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('New version available'),
+            content: const Text('A new version of Aurora Music is available. Would you like to download it now?'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await launch('https://github.com/D4v31x/Aurora-Music_ALPHA_RELEASES/releases/latest'); // Replace this line
+                },
+                child: const Text('Download'),
+              ),
+            ],
+          );
+        },
+      );
+    });
+  }
+
     return Scaffold(
       backgroundColor: isDarkMode? Color(0xFF1A1A1D) : Color(0xFFE5E5E5),
       body: Stack(
