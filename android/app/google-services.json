@@ -12,7 +12,20 @@
           "package_name": "com.example.aurora_music_v01"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "58059013710-qtmb5eivg5a31ojq4o0qgtjdp0rujp4q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.aurora_music_v01",
+            "certificate_hash": "fecbb212948429294ac490428b82de3b4a6b34f1"
+          }
+        },
+        {
+          "client_id": "58059013710-8uc4budu6hsk89el0m5141ok6m06o6p1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC4R5yY1wVs2d7NleymHcd6j-uiWOIrvhI"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "58059013710-8uc4budu6hsk89el0m5141ok6m06o6p1.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "58059013710-hgferkge000r55p7486bqh39g02kii4v.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.auroraMusicV01"
+              }
+            }
+          ]
         }
       }
     }

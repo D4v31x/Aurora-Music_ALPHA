@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
@@ -11,7 +11,7 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPageState extends State<SignUpPage> {
-  final _supabase = Supabase.instance.client;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   late String email;
   late String password;
   late String confirmPassword;
@@ -44,7 +44,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
   Future<void> _resetPassword() async {
     try {
-      await _supabase.auth.resetPasswordForEmail(email);
+      await _auth.sendPasswordResetEmail(email: email);
       _showErrorDialog(context, 'Password reset email sent');
     } catch (e) {
       _showErrorDialog(context, 'Error resetting password: $e');
@@ -53,7 +53,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
   void _scrollToFormField(BuildContext context, TextFormField formField) {
     final RenderBox? box = context.findRenderObject() as RenderBox?;
-    if (box != null) {
+    if (box!= null) {
       final Offset position = box.localToGlobal(Offset.zero);
       final double screenHeight = MediaQuery.of(context).size.height;
       final double scrollPosition = position.dy - (screenHeight * 0.1);
@@ -66,27 +66,20 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   Future<void> _signUp() async {
-    int retryCount = 0;
-    const int maxRetries = 3;
-    const int retryDelay = 2; // in seconds
-
-    while (retryCount < maxRetries) {
-      try {
-        await _supabase.auth.signUp(email: email, password: password);
-        Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen()));
-        return;
-      } catch (e) {
-        if (e is AuthException) {
-          retryCount++;
-          await Future.delayed(Duration(seconds: retryDelay));
+    try {
+      await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+    } catch (e) {
+      if (e is FirebaseAuthException) {
+        if (e.code == 'weak-password') {
+          _showErrorDialog(context, 'Password must be longer than 8 characters, and must contain Uppercase and lowercase letter, number and special symbol');
         } else {
           _showErrorDialog(context, 'An error occurred during sign up. Please try again later.');
-          return;
         }
+      } else {
+        _showErrorDialog(context, 'An error occurred during sign up. Please try again later.');
       }
     }
-
-    _showErrorDialog(context, 'Unable to sign up. Please try again later.');
   }
 
   @override
@@ -94,13 +87,13 @@ class _SignUpPageState extends State<SignUpPage> {
     isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Color(0xFF1A1A1D) : Color(0xFFE5E5E5),
+      backgroundColor: isDarkMode? Color(0xFF1A1A1D) : Color(0xFFE5E5E5),
       body: Stack(
         children: [
           Container(
             decoration: BoxDecoration(
               image: DecorationImage(
-                image: AssetImage(isDarkMode ? 'assets/images/background/dark_back.jpg' : 'assets/images/background/light_back.jpg'),fit: BoxFit.cover,
+                image: AssetImage(isDarkMode? 'assets/images/background/dark_back.jpg' : 'assets/images/background/light_back.jpg'),fit: BoxFit.cover,
               ),
             ),
           ),
@@ -254,7 +247,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                 borderRadius: BorderRadius.circular(22),
                                 borderSide: BorderSide(
                                   color: Colors.white,
-                                  width: 20,
+                width: 20,
                                 ),
                               ),
                               filled: true,
@@ -295,7 +288,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                 return;
                               }
                               try {
-                                await _supabase.auth.signUp(email: email, password: password);
+                                await _signUp();
                                 Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen()));
                               } catch (e) {
                                 if (e is Exception || e is Error) {
