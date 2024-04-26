@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 class LoginPage extends StatefulWidget {
   @override
   _LoginPageState createState() => _LoginPageState();
+  
 }
 
 class _LoginPageState extends State<LoginPage> {
@@ -24,27 +25,30 @@ class _LoginPageState extends State<LoginPage> {
   final emailFocusNode = FocusNode();
   Version? latestVersion;
 
+
+
   final _formKey = GlobalKey<FormState>();
   final Connectivity _connectivity = Connectivity();
-
-  @override
-  void initState() {
-    super.initState();
-    checkForNewVersion();
-    _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
-      setState(() {
-        _error = results.contains(ConnectivityResult.none)? 'No internet connection' : null;
-      });
+       
+@override
+void initState() {
+  super.initState();
+  checkForNewVersion();
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+  });
+  _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+    setState(() {
+      _error = results.contains(ConnectivityResult.none)? 'No internet connection' : null;
     });
-    _scrollController = ScrollController();
-    isDarkMode = true;
-    emailFocusNode.addListener(() {
-      if (emailFocusNode.hasFocus) {
-        _scrollToFormField(context, emailFocusNode.context!.findAncestorWidgetOfExactType<TextFormField>()!);
-      }
-    });
-  }
-  
+  });
+  _scrollController = ScrollController();
+  isDarkMode = true;
+  emailFocusNode.addListener(() {
+    if (emailFocusNode.hasFocus) {
+      _scrollToFormField(context, emailFocusNode.context!.findAncestorWidgetOfExactType<TextFormField>()!);
+    }
+  });
+}
   
 
   Future<void> _resetPassword() async {
@@ -112,7 +116,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
     final regex = RegExp(r'^v?(\d+\.\d+\.\d+)(-\S+)?$');
-  final match = regex.firstMatch('v0.0.4-alpha');
+  final match = regex.firstMatch('v0.0.5-alpha');
   final currentVersion = Version.parse(match!.group(1)!);
   final isUpdateAvailable = latestVersion != null && latestVersion!.compareTo(currentVersion) > 0;
 
@@ -283,23 +287,23 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         SizedBox(height: 10),
                         ElevatedButton(
-                          onPressed: () async {
-                            if (_formKey.currentState!.validate()) {
-                              if (_error != null) {
-                                _showErrorDialog(context, _error!);
-                                return;
-                              }
-                              try {
-                                final response = await _auth.signInWithEmailAndPassword(email: email, password: password);
-                                if (response.user == null) {
-                                  _showErrorDialog(context, 'Invalid email or password');
-                                } else {
-                                  Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen()));
-                                }
-                              } catch (e) {
-                                _showErrorDialog(context, 'An error occurred during login.');
-                              }
-                            }
+  onPressed: () async {
+    if (_formKey.currentState!.validate()) {
+      if (_error!= null) {
+        _showErrorDialog(context, _error!);
+        return;
+      }
+      try {
+        final response = await _auth.signInWithEmailAndPassword(email: email, password: password);
+        if (response.user == null) {
+          _showErrorDialog(context, 'Invalid email or password');
+        } else {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+        }
+      } catch (e) {
+        _showErrorDialog(context, 'An error occurred during login.');
+      }
+    }
                           },
                           child: Text(
                             'Log in',
@@ -438,4 +442,6 @@ class _LoginPageState extends State<LoginPage> {
     _scrollController.dispose();
     super.dispose();
   }
+
+  
 }

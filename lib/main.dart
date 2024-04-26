@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await Firebase.initializeApp();
-
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final User? _currentUser = _auth.currentUser;
+
+  
 
   runApp(FutureBuilder(
     future: Firebase.initializeApp(),
@@ -21,6 +21,7 @@ void main() async {
       }
     },
   ));
+  
 }
 
 class MyApp extends StatelessWidget {

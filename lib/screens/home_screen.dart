@@ -24,6 +24,19 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     user = FirebaseAuth.instance.currentUser;
+
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      setState(() {
+        isWelcomeBackVisible = false;
+      });
+    });
+
+    Future.delayed(const Duration(milliseconds: 2500), () {
+      setState(() {
+        isAuroraMusicVisible = true;
+      });
+    });
+    
     checkForNewVersion();
   }
 
@@ -68,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final regex = RegExp(r'^v?(\d+\.\d+\.\d+)(-[a-zA-Z]+)?$');
-    final match = regex.firstMatch('v0.0.4-alpha');
+    final match = regex.firstMatch('v0.0.5-alpha');
     final currentVersion = Version.parse(match!.group(1)!);
     final isUpdateAvailable = latestVersion!= null && latestVersion!.compareTo(currentVersion) > 0;
 
