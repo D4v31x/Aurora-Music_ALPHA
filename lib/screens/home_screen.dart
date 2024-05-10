@@ -256,7 +256,7 @@ Future<void> fetchSongs() async {
                       ),
                     ),
                     songs.isEmpty
-                        ? Center(child: CircularProgressIndicator())
+                    ? Center(child: CircularProgressIndicator())
                         : ListView.builder(
   itemCount: songs.length,
   itemBuilder: (context, index) {
