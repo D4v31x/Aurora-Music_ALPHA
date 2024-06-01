@@ -110,10 +110,6 @@ class _HomeScreenAdsState extends State<HomeScreenAds> {
                 child: ElevatedButton(
                   onPressed: () async {
                     await FirebaseAuth.instance.signOut();
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => LoginPage()),
-                    );
                   },
                   child: Text(
                     'Log out',

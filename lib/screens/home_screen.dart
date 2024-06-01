@@ -2,16 +2,19 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:aurora_music_v01/screens/login_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:version/version.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:permission_handler/permission_handler.dart' as permissionhandler;
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:appwrite/appwrite.dart';
+import 'package:aurora_music_v01/screens/now_playing.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key});
+  final Client client;
+
+  const HomeScreen({Key? key, required this.client}) : super(key: key);
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -21,15 +24,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late bool isDarkMode;
   bool isWelcomeBackVisible = true;
   bool isAuroraMusicVisible = false;
-  User? user;
+  Account? account;
   Version? latestVersion;
   late TabController _tabController;
-  List<SongModel> songs = []; // Initialize with empty list
+  List<SongModel> songs = [];
 
   @override
   void initState() {
     super.initState();
-    user = FirebaseAuth.instance.currentUser;
+
+    // Initialize the Account object
+    account = Account(widget.client);
+
+    checkForAuthentication();
 
     Future.delayed(const Duration(milliseconds: 1500), () {
       setState(() {
@@ -45,6 +52,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     checkForNewVersion();
     fetchSongs();
+  }
+
+  Future<void> checkForAuthentication() async {
+    try {
+      final session = await account!.getSession(sessionId: 'current');
+      if (session != null) {
+        setState(() {
+          account = account;
+        });
+      }
+    } catch (e) {
+      // If there's an error fetching the session, navigate to the login screen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => LoginPage(client: widget.client)),
+      );
+    }
   }
 
   Future<void> checkForNewVersion() async {
@@ -68,33 +92,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-Future<void> fetchSongs() async {
-  if (Platform.isAndroid) {
-     await Permission.audio.request();
-    if (await Permission.mediaLibrary.request().isGranted) {
-      // Permission is granted, fetch songs
-      final onAudioQuery = OnAudioQuery();
-      try {
-        final songsResult = await onAudioQuery.querySongs();
-        setState(() {
-          songs = songsResult;
-        });
-      } catch (e) {
-        // Handle error
-        print('Error fetching songs: $e');
+  Future<void> fetchSongs() async {
+    try {
+      if (Platform.isAndroid) {
+        // Requesting audio permission
+        var audioPermissionStatus = await permissionhandler.Permission.audio.status;
+        if (!audioPermissionStatus.isGranted) {
+          audioPermissionStatus = await permissionhandler.Permission.audio.request();
+        }
+
+        // Requesting storage permission
+        var storagePermissionStatus = await permissionhandler.Permission.storage.status;
+        if (!storagePermissionStatus.isGranted) {
+          storagePermissionStatus = await permissionhandler.Permission.storage.request();
+        }
+
+        // Proceed if permissions are granted
+        if (audioPermissionStatus.isGranted && storagePermissionStatus.isGranted) {
+          final onAudioQuery = OnAudioQuery();
+          final songsResult = await onAudioQuery.querySongs();
+          setState(() {
+            songs = songsResult;
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Permissions denied'),
+            ),
+          );
+        }
       }
-    } else {
-      // Permission is denied, show a message to the user
+    } catch (e) {
+      print('Error fetching songs: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Permission denied'),
+          content: Text('Error fetching songs'),
         ),
       );
     }
-  } else {
-    // Handle other platforms
   }
-}
+
 
   void launchURL(String url) async {
     if (await canLaunch(url)) {
@@ -105,6 +142,18 @@ Future<void> fetchSongs() async {
       }
     } else {
       throw 'Could not launch $url';
+    }
+  }
+
+  Future<void> logout() async {
+    try {
+      await account!.deleteSession(sessionId: 'current');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => LoginPage(client: widget.client)),
+      );
+    } catch (e) {
+      print('Error logging out: $e');
     }
   }
 
@@ -142,7 +191,7 @@ Future<void> fetchSongs() async {
                   onPressed: () async {
                     Navigator.pop(context);
                     await launch(
-                        'https://github.com/D4v31x/Aurora-Music_ALPHA_RELEASES/releases/latest'); // Replace this line
+                        'https://github.com/D4v31x/Aurora-Music_ALPHA_RELEASES/releases/latest');
                   },
                   child: const Text('Download'),
                 ),
@@ -155,139 +204,163 @@ Future<void> fetchSongs() async {
 
     _tabController = TabController(length: 2, vsync: this);
 
-    return user == null
-        ? LoginPage()
-        : Stack(
-            children: [
-              Container(
-                width: double.infinity,
+    return account != null
+        ? Stack(
+      children: [
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            image: DecorationImage(
+              image: AssetImage(isDarkMode
+                  ? 'assets/images/background/dark_back.jpg'
+                  : 'assets/images/background/light_back.jpg'),
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+        Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0.0,
+            toolbarHeight: 180,
+            automaticallyImplyLeading: false,
+            title: Stack(
+              children: [
+                Center(
+                  child: AnimatedOpacity(
+                    opacity: isWelcomeBackVisible ? 1.0 : 0.0,
+                    duration: const Duration(seconds: 1),
+                    child: const Text(
+                      'Welcome Back',
+                      style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontStyle: FontStyle.normal,
+                          color: Colors.white,
+                          fontSize: 34,
+                          fontWeight: FontWeight.normal),
+                    ),
+                  ),
+                ),
+                Center(
+                  child: AnimatedOpacity(
+                    opacity: isAuroraMusicVisible ? 1.0 : 0.0,
+                    duration: const Duration(seconds: 1),
+                    child: const Text(
+                      'Aurora Music',
+                      style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontStyle: FontStyle.normal,
+                          color: Colors.white,
+                          fontSize: 34,
+                          fontWeight: FontWeight.normal),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'logout') {
+                    logout();
+                  }
+                },
+                itemBuilder: (BuildContext context) {
+                  return [
+                    PopupMenuItem<String>(
+                      value: 'logout',
+                      child: Text('Logout'),
+                    ),
+                  ];
+                },
+              ),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(50),
+              child: Container(
                 decoration: BoxDecoration(
                   color: Colors.transparent,
-                  image: DecorationImage(
-                    image: AssetImage(isDarkMode
-                        ? 'assets/images/background/dark_back.jpg'
-                        : 'assets/images/background/light_back.jpg'),
-                    fit: BoxFit.cover,
-                  ),
                 ),
-              ),
-              Scaffold(
-                backgroundColor: Colors.transparent,
-                appBar: AppBar(
-                  backgroundColor: Colors.transparent,
-                  elevation: 0.0,
-                  toolbarHeight: 180,
-                  automaticallyImplyLeading: false,
-                  title: Stack(
-                    children: [
-                      Center(
-                        child: AnimatedOpacity(
-                          opacity: isWelcomeBackVisible ? 1.0 : 0.0,
-                          duration: const Duration(seconds: 1),
-                          child: const Text(
-                            'Welcome Back',
-                            style: TextStyle(
-                                fontFamily: 'Outfit',
-                                fontStyle: FontStyle.normal,
-                                color: Colors.white,
-                                fontSize: 34,
-                                fontWeight: FontWeight.normal),
-                          ),
-                        ),
-                      ),
-                      Center(
-                        child: AnimatedOpacity(
-                          opacity: isAuroraMusicVisible ? 1.0 : 0.0,
-                          duration: const Duration(seconds: 1),
-                          child: const Text(
-                            'Aurora Music',
-                            style: TextStyle(
-                                fontFamily: 'Outfit',
-                                fontStyle: FontStyle.normal,
-                                color: Colors.white,
-                                fontSize: 34,
-                                fontWeight: FontWeight.normal),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  bottom: PreferredSize(
-                    preferredSize: const Size.fromHeight(50),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.transparent,
-                      ),
-                      child: TabBar(
-                        controller: _tabController,
-                        indicator: OutlineIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                          text: 'Home',
-                        ),
-                        dividerColor: Colors.transparent,
-                        labelStyle:
-                            TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        unselectedLabelStyle: TextStyle(fontSize: 16),
-                        tabs: [
-                          Tab(
-                            text: 'Home',
-                          ),
-                          Tab(
-                            text: 'Library',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                body: TabBarView(
+                child: TabBar(
                   controller: _tabController,
-                  children: [
-                    Center(
-                      child: Text(
-                        'App is under construction',
-                        style: TextStyle(
-                            fontFamily: 'Outfit',
-                            fontStyle: FontStyle.normal,
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700),
+                  indicator: OutlineIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                    text: 'Custom Indicator',
+                    radius: Radius.circular(24),
+                  ),
+                  tabs: const [
+                    Tab(
+                      icon: Icon(
+                        Icons.music_note,
+                        color: Colors.white,
                       ),
+                      text: 'Songs',
                     ),
-                    songs.isEmpty
-                    ? Center(child: CircularProgressIndicator())
-                        : ListView.builder(
-  itemCount: songs.length,
-  itemBuilder: (context, index) {
-    final song = songs[index];
-    return ListTile(
-      title: Text(
-        song.title,
-        style: TextStyle(color: Colors.white),
-      ),
-      subtitle: Text(
-        song.artist.toString(), 
-        style: TextStyle(color: Colors.white),
-      ),
-      onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => NowPlayingScreen(
-        currentSong: song,
-      ),
-    ),
-  );
-},
-    );
-  },
-)
+                    Tab(
+                      icon: Icon(
+                        Icons.playlist_play,
+                        color: Colors.white,
+                      ),
+                      text: 'Playlist',
+                    ),
                   ],
                 ),
               ),
+            ),
+          ),
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              ListView.builder(
+                itemCount: songs.length,
+                itemBuilder: (context, index) {
+                  final song = songs[index];
+                  return ListTile(
+                    leading: QueryArtworkWidget(
+                      id: song.id,
+                      type: ArtworkType.AUDIO,
+                      artworkFit: BoxFit.cover,
+                      nullArtworkWidget: const Icon(
+                        Icons.music_note,
+                        color: Colors.white,
+                      ),
+                    ),
+                    title: Text(
+                      song.title.toString(),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    subtitle: Text(
+                      song.artist.toString(),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NowPlayingScreen(currentSong: song),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+              const Center(
+                child: Text('Playlist'),
+              ),
             ],
-          );
+          ),
+        ),
+      ],
+    )
+        : Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
   }
 }
 
@@ -324,9 +397,9 @@ class _OutlinePainter extends BoxPainter {
     required this.radius,
     VoidCallback? onChange,
   })  : _paint = Paint()
-          ..style = PaintingStyle.stroke
-          ..color = color
-          ..strokeWidth = strokeWidth,
+    ..style = PaintingStyle.stroke
+    ..color = color
+    ..strokeWidth = strokeWidth,
         super(onChange);
 
   final Color color;
@@ -342,7 +415,7 @@ class _OutlinePainter extends BoxPainter {
     final textPainter = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.bold,
         ),
@@ -364,107 +437,3 @@ class _OutlinePainter extends BoxPainter {
   }
 }
 
-
-
-class NowPlayingScreen extends StatefulWidget {
-  final SongModel? currentSong;
-
-  NowPlayingScreen({required this.currentSong});
-
-  @override
-  _NowPlayingScreenState createState() => _NowPlayingScreenState();
-}
-
-class _NowPlayingScreenState extends State<NowPlayingScreen> {
-  late AudioPlayer _audioPlayer;
-
-  @override
-  void initState() {
-    super.initState();
-    _audioPlayer = AudioPlayer();
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
-  }
-
-  void _play() async {
-    if (widget.currentSong!= null) {
-      final url = widget.currentSong!.uri;
-      await _audioPlayer.setUrl(url.toString());
-      await _audioPlayer.play();
-    }
-  }
-
-  void _stop() async {
-    await _audioPlayer.stop();
-  }
-
-  void _skip() async {
-    // Implement skip functionality
-  }
-
-  void _back() async {
-    // Implement back functionality
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Now Playing'),
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          GestureDetector(
-            onTap: () {
-              // Handle song name tap
-            },
-            child: Text(
-              widget.currentSong?.title?? 'No song playing',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-          ),
-          GestureDetector(
-            onTap: () {
-              // Handle artist name tap
-            },
-            child: Text(
-              widget.currentSong?.artist?? 'Unknown artist',
-              style: TextStyle(fontSize: 18),
-            ),
-          ),
-          Expanded(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.play_arrow),
-                    onPressed: _play,
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.stop),
-                    onPressed: _stop,
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.skip_next),
-                    onPressed: _skip,
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.skip_previous),
-                    onPressed: _back,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
