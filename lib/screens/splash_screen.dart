@@ -1,141 +1,122 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-import 'package:aurora_music_v01/screens/login_screen.dart';
+import 'package:video_player/video_player.dart';
+import 'package:appwrite/appwrite.dart';
+import 'login_screen.dart';
+import 'sign_screen.dart';
+import 'home_screen.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final bool isFirstRun;
+  final Client client;
+
+  const SplashScreen({required this.isFirstRun, required this.client, super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  String versionNumber = '0.0.0'; // Set the version number to an initial value
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late VideoPlayerController _videoController;
 
   @override
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: [SystemUiOverlay.top]);
 
-    // Fetch the version number asynchronously
-    _fetchVersionNumber();
+    // Initialize the video controller
+    _videoController = VideoPlayerController.asset('assets/videos/longsplash.mp4')
+      ..initialize().then((_) {
+        setState(() {}); // Ensure the first frame is shown after the video is initialized
+        _videoController.setVolume(0); // Mute the video
+        _videoController.play();
+      }).catchError((error) {
+        print("Error initializing video player: $error");
+      });
 
-    Future.delayed(const Duration(seconds: 1), () {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => LoginPage(),
-        )
-      );
+    // Initialize the animation controller
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+
+    // Define the fade animation
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
+
+    // Start the splash screen
+    _startSplashScreen();
+  }
+
+  void _startSplashScreen() async {
+    await Future.delayed(const Duration(milliseconds: 3000));
+    _animationController.forward();
+    // Add a listener to navigate to the next screen after the animation completes
+    _animationController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _navigateToNextScreen();
+      }
     });
   }
 
-  // Create a method to fetch the version number
-  Future<void> _fetchVersionNumber() async {
-    final PackageInfo packageInfo = await PackageInfo.fromPlatform();
-    setState(() {
-      versionNumber = packageInfo.version;
-    });
+  void _navigateToNextScreen() async {
+    final storage = FlutterSecureStorage();
+    String? sessionId = await storage.read(key: 'sessionId'); // Add await here
+
+    if (sessionId!= null) {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => HomeScreen(client: widget.client, sessionId: sessionId),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+        ),
+      );
+    } else {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => LoginPage(client: widget.client),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
+    _animationController.dispose();
+    _videoController.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    bool isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
-
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.transparent,
-          image: DecorationImage(
-            image: AssetImage(isDarkMode? 'assets/images/background/dark_back.jpg' : 'assets/images/background/light_back.jpg'),
-            fit: BoxFit.cover,
-          ),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Align(
-                alignment: Alignment.center,
-                child: Column(
-                  children: [
-                    Image(
-                      image: AssetImage('assets/images/logo/Music_logo.png'),
-                      height: 150,
-                    ),
-                    SizedBox(height: 20),
-                    Text(
-                      'Aurora Music',
-                      style: TextStyle(
-                        fontFamily: 'Outfit',
-                        fontStyle: FontStyle.normal,
-                        color:Colors.white,
-                        fontSize: 48,
-                        fontWeight: FontWeight.normal
-                      ),
-                    ),
-                  ],
+      body: Stack(
+        children: [
+          if (_videoController.value.isInitialized)
+            Positioned.fill(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _videoController.value.size.width,
+                  height: _videoController.value.size.height,
+                  child: VideoPlayer(_videoController),
                 ),
               ),
-              SizedBox(height: 50),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Developed by',
-                    style: TextStyle(
-                      fontFamily: 'Outfit',
-                      fontStyle: FontStyle.normal,
-                      color: Colors.white,
-                      fontSize: 18,
-fontWeight: FontWeight.normal
-                    ),
-                  ),
-                  SizedBox(width: 10),
-                  Image(
-                    image: AssetImage('assets/images/logo/Aurora_logo.png'),
-                    height: 20,
-                  ),
-                ],
-              ),
-              SizedBox(height: 50), // Add this line to add margin/padding from bottom
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Version ',
-                    style: TextStyle(
-                      fontFamily: 'Outfit',
-                      fontStyle: FontStyle.normal,
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.normal
-                    ),
-                  ),
-                  Text(
-                    versionNumber,
-                    style: TextStyle(
-                      fontFamily: 'Outfit',
-                      fontStyle: FontStyle.normal,
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
+          FadeTransition(
+            opacity: _fadeAnimation,
+            child: Container(
+              color: Colors.transparent,
+            ),
           ),
-        ),
-),
+        ],
+      ),
     );
   }
 }

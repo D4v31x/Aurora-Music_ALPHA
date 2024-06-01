@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:appwrite/appwrite.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
 import 'home_screen_ads.dart';
 
 class SignUpPage extends StatefulWidget {
+  final Client client;
+
+  SignUpPage({required this.client});
+
   @override
   _SignUpPageState createState() => _SignUpPageState();
 }
 
 class _SignUpPageState extends State<SignUpPage> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
   late String email;
   late String password;
   late String confirmPassword;
@@ -23,13 +26,14 @@ class _SignUpPageState extends State<SignUpPage> {
 
   final _formKey = GlobalKey<FormState>();
   final Connectivity _connectivity = Connectivity();
+  late Account _account;
 
   @override
   void initState() {
     super.initState();
     _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
       setState(() {
-        _error = results.contains(ConnectivityResult.none)? 'No internet connection' : null;
+        _error = results.contains(ConnectivityResult.none) ? 'No internet connection' : null;
       });
     });
     _scrollController = ScrollController();
@@ -40,11 +44,16 @@ class _SignUpPageState extends State<SignUpPage> {
         _scrollToFormField(context, emailFocusNode.context!.findAncestorWidgetOfExactType<TextFormField>()!);
       }
     });
+
+    _account = Account(widget.client);
   }
 
   Future<void> _resetPassword() async {
     try {
-      await _auth.sendPasswordResetEmail(email: email);
+      await _account.createRecovery(
+        email: email,
+        url: 'https://example.com/reset-password',
+      );
       _showErrorDialog(context, 'Password reset email sent');
     } catch (e) {
       _showErrorDialog(context, 'Error resetting password: $e');
@@ -53,7 +62,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
   void _scrollToFormField(BuildContext context, TextFormField formField) {
     final RenderBox? box = context.findRenderObject() as RenderBox?;
-    if (box!= null) {
+    if (box != null) {
       final Offset position = box.localToGlobal(Offset.zero);
       final double screenHeight = MediaQuery.of(context).size.height;
       final double scrollPosition = position.dy - (screenHeight * 0.1);
@@ -67,18 +76,25 @@ class _SignUpPageState extends State<SignUpPage> {
 
   Future<void> _signUp() async {
     try {
-      await _auth.createUserWithEmailAndPassword(email: email, password: password);
-      Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+      print('Signing up user...');
+      final response = await _account.create(
+        userId: ID.unique(),
+        email: email,
+        password: password,
+      );
+      print('User signed up successfully!');
+      Navigator.push(context, MaterialPageRoute(builder: (context) => LoginPage(client: widget.client)));
     } catch (e) {
-      if (e is FirebaseAuthException) {
-        if (e.code == 'weak-password') {
-          _showErrorDialog(context, 'Password must be longer than 8 characters, and must contain Uppercase and lowercase letter, number and special symbol');
-        } else {
-          _showErrorDialog(context, 'An error occurred during sign up. Please try again later.');
+      print('Error during sign up: $e');
+      if (e is AppwriteException) {
+        if (e.code == 400 && e.message != null) {
+          if (e.message!.contains('Invalid `password` param: Password must be between 8 and 265 characters long, and should not be one of the commonly used password.')) {
+            _showErrorDialog(context, 'Password must be between 8 and 265 characters long, and should not be one of the commonly used passwords.');
+            return;
+          }
         }
-      } else {
-        _showErrorDialog(context, 'An error occurred during sign up. Please try again later.');
       }
+      _showErrorDialog(context, 'An error occurred during sign up. Please try again later.');
     }
   }
 
@@ -87,18 +103,19 @@ class _SignUpPageState extends State<SignUpPage> {
     isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDarkMode? Color(0xFF1A1A1D) : Color(0xFFE5E5E5),
+      backgroundColor: isDarkMode ? Color(0xFF1A1A1D) : Color(0xFFE5E5E5),
       body: Stack(
         children: [
           Container(
             decoration: BoxDecoration(
               image: DecorationImage(
-                image: AssetImage(isDarkMode? 'assets/images/background/dark_back.jpg' : 'assets/images/background/light_back.jpg'),fit: BoxFit.cover,
+                image: AssetImage(isDarkMode ? 'assets/images/background/dark_back.jpg' : 'assets/images/background/light_back.jpg'),
+                fit: BoxFit.cover,
               ),
             ),
           ),
           SingleChildScrollView(
-            controller:_scrollController,
+            controller: _scrollController,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -153,7 +170,9 @@ class _SignUpPageState extends State<SignUpPage> {
                               }
                               return null;
                             },
-                            onChanged: (value) {email = value; },
+                            onChanged: (value) {
+                              email = value;
+                            },
                             style: TextStyle(
                               fontFamily: 'Outfit',
                               fontStyle: FontStyle.normal,
@@ -180,7 +199,6 @@ class _SignUpPageState extends State<SignUpPage> {
                             ),
                           ),
                         ),
-
                         Container(
                           padding: EdgeInsets.only(top: 0, bottom: 3),
                           child: TextFormField(
@@ -190,7 +208,9 @@ class _SignUpPageState extends State<SignUpPage> {
                               }
                               return null;
                             },
-                            onChanged: (value) { password = value; },
+                            onChanged: (value) {
+                              password = value;
+                            },
                             style: TextStyle(
                               fontFamily: 'Outfit',
                               fontStyle: FontStyle.normal,
@@ -203,7 +223,7 @@ class _SignUpPageState extends State<SignUpPage> {
                               hintStyle: TextStyle(
                                 fontFamily: 'Outfit',
                                 fontStyle: FontStyle.normal,
-                                color: Color.fromARGB(150, 255, 255,255),
+                                color: Color.fromARGB(150, 255, 255, 255),
                               ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(22),
@@ -228,10 +248,12 @@ class _SignUpPageState extends State<SignUpPage> {
                               }
                               return null;
                             },
-                            onChanged: (value) {confirmPassword = value; },
+                            onChanged: (value) {
+                              confirmPassword = value;
+                            },
                             style: TextStyle(
                               fontFamily: 'Outfit',
-                              fontStyle:FontStyle.normal,
+                              fontStyle: FontStyle.normal,
                               color: Colors.white,
                               fontSize: 15,
                               fontWeight: FontWeight.normal,
@@ -247,7 +269,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                 borderRadius: BorderRadius.circular(22),
                                 borderSide: BorderSide(
                                   color: Colors.white,
-                width: 20,
+                                  width: 20,
                                 ),
                               ),
                               filled: true,
@@ -283,20 +305,11 @@ class _SignUpPageState extends State<SignUpPage> {
                         ElevatedButton(
                           onPressed: () async {
                             if (_formKey.currentState!.validate() && _agreeToTerms) {
-                              if (_error!= null) {
+                              if (_error != null) {
                                 _showErrorDialog(context, _error!);
                                 return;
                               }
-                              try {
-                                await _signUp();
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen()));
-                              } catch (e) {
-                                if (e is Exception || e is Error) {
-                                  _showErrorDialog(context, e.toString());
-                                } else {
-                                  _showErrorDialog(context, 'An error occurred during sign up.');
-                                }
-                              };
+                              await _signUp();
                             }
                           },
                           child: Text(
@@ -309,16 +322,17 @@ class _SignUpPageState extends State<SignUpPage> {
                               fontWeight: FontWeight.normal,
                             ),
                           ),
-                          style: ElevatedButton.styleFrom(backgroundColor: Color.fromARGB(99, 255, 255, 255),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color.fromARGB(99, 255, 255, 255),
                             padding: EdgeInsets.symmetric(
                               horizontal: 50,
                               vertical: 15,
                             ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(22), 
+                              borderRadius: BorderRadius.circular(22),
                               side: BorderSide(
-                                color: const Color.fromARGB(123, 255, 255, 255), 
-                                width: 2, 
+                                color: const Color.fromARGB(123, 255, 255, 255),
+                                width: 2,
                               ),
                             ),
                           ),
@@ -334,9 +348,9 @@ class _SignUpPageState extends State<SignUpPage> {
                                     _resetPassword();
                                   },
                                   child: Text(
-                                    'Forgot Password?',
+                                    'Forgot Password? (Not Implemented)',
                                     style: TextStyle(
-                                     fontFamily: 'Outfit',
+                                      fontFamily: 'Outfit',
                                       fontStyle: FontStyle.normal,
                                       color: Colors.white,
                                       fontSize: 15,
@@ -349,7 +363,24 @@ class _SignUpPageState extends State<SignUpPage> {
                               Flexible(
                                 child: TextButton(
                                   onPressed: () {
-                                    Navigator.push(context, MaterialPageRoute(builder: (context) => LoginPage()));
+                                    Navigator.push(
+                                      context,
+                                      PageRouteBuilder(
+                                        pageBuilder: (context, animation, secondaryAnimation) => LoginPage(client: widget.client),
+                                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                          var begin = 0.0;
+                                          var end = 1.0;
+                                          var curve = Curves.easeInOut;
+
+                                          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+
+                                          return FadeTransition(
+                                            opacity: animation.drive(tween),
+                                            child: child,
+                                          );
+                                        },
+                                      ),
+                                    );
                                   },
                                   child: Text(
                                     'Log in to Aurora ID',
@@ -418,7 +449,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 style: TextStyle(
                   fontFamily: 'Outfit',
                   fontStyle: FontStyle.normal,
-                  color: Color.fromARGB(255,147,17,218),
+                  color: Color.fromARGB(255, 147, 17, 218),
                   fontSize: 16,
                   fontWeight: FontWeight.normal,
                 ),
@@ -433,6 +464,7 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   void dispose() {
     _scrollController.dispose();
+    emailFocusNode.dispose();
     super.dispose();
   }
 }

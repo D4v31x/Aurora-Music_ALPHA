@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.0.5-alpha
+version: 0.0.6-alpha
 
 environment:
   sdk: '>=3.3.3 <4.0.0'
@@ -32,13 +32,9 @@ dependencies:
     sdk: flutter
   just_audio: ^0.9.37
   audioplayers: ^6.0.0
-  cupertino_icons: ^1.0.6
   permission_handler: ^11.3.1
   flutter_launcher_icons: ^0.13.1
-  firebase_auth: ^4.19.2
-  firebase_core: ^2.30.0
   connectivity_plus: ^6.0.2
-  supabase_flutter: ^2.5.1
   http: ^1.2.1
   package_info_plus: ^8.0.0
   url_launcher: ^6.2.6
@@ -48,7 +44,18 @@ dependencies:
   on_audio_query: ^2.9.0
   path_provider: ^2.1.3
   provider: ^6.1.2
+  firebase_core: ^2.32.0
+  firebase_auth: ^4.20.0
   appwrite: ^12.0.3
+  video_player: ^2.8.6
+  flutter_animate: ^4.5.0
+  flutter_secure_storage: ^9.2.2
+
+flutter_native_splash:
+  android: true
+  ios: ture
+  background_image: assets/images/background/not.png
+  image: assets/images/logo/Music_logo.png
 
 
 dev_dependencies:
@@ -61,7 +68,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^3.0.0
+  flutter_lints: ^4.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -77,27 +84,28 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   fonts:
-   - family: Outfit
-     fonts:
-      - asset: assets/fonts/Outfit-Black.ttf
-      - asset: assets/fonts/Outfit-ExtraBold.ttf
-      - asset: assets/fonts/Outfit-ExtraLight.ttf
-      - asset: assets/fonts/Outfit-Light.ttf
-      - asset: assets/fonts/Outfit-Medium.ttf
-      - asset: assets/fonts/Outfit-Thin.ttf
+    - family: Outfit
+      fonts:
+        - asset: assets/fonts/Outfit-Black.ttf
+        - asset: assets/fonts/Outfit-ExtraBold.ttf
+        - asset: assets/fonts/Outfit-ExtraLight.ttf
+        - asset: assets/fonts/Outfit-Light.ttf
+        - asset: assets/fonts/Outfit-Medium.ttf
+        - asset: assets/fonts/Outfit-Thin.ttf
 
-   - family: OutfitSemi
-     fonts:
-      - asset: assets/fonts/Outfit-SemiBold.ttf
+    - family: OutfitSemi
+      fonts:
+        - asset: assets/fonts/Outfit-SemiBold.ttf
 
 
   assets:
-      - assets/images/background/light_back.jpg
-      - assets/images/background/dark_back.jpg
-      - assets/images/logo/Music_logo.png
-      - assets/images/logo/Aurora_logo.png
-      - assets/images/logo/App_logo.png
-      - assets/images/logo/AuroraID_logo.png
+    - assets/images/background/light_back.jpg
+    - assets/images/background/dark_back.jpg
+    - assets/images/logo/Music_logo.png
+    - assets/images/logo/Aurora_logo.png
+    - assets/images/logo/App_logo.png
+    - assets/images/logo/AuroraID_logo.png
+    - assets/videos/animation.mp4
 
   # To add assets to your application, add an assets section, like this:
   # assets:
