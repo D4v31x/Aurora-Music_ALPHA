@@ -9,6 +9,7 @@ import 'package:version/version.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/models.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class LoginPage extends StatefulWidget {
   final Client client;
@@ -31,6 +32,7 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final Connectivity _connectivity = Connectivity();
   late Account account;
+  final secureStorage = FlutterSecureStorage();
 
   bool _isPasswordVisible = false;
 
@@ -77,6 +79,11 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _storeSessionId(String sessionId) async {
+    final storage = FlutterSecureStorage();
+    await storage.write(key: 'sessionId', value: sessionId);
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -119,7 +126,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
     final regex = RegExp(r'^v?(\d+\.\d+\.\d+)(-\S+)?$');
-    final match = regex.firstMatch('v0.0.5-alpha');
+    final match = regex.firstMatch('v0.0.6-alpha');
     final currentVersion = Version.parse(match!.group(1)!);
     final isUpdateAvailable = latestVersion != null && latestVersion!.compareTo(currentVersion) > 0;
 
@@ -316,7 +323,8 @@ class _LoginPageState extends State<LoginPage> {
                                 );
                                 print('Login successful!'); // Add this line
                                 print('User ID: ${session.userId}'); // Add this line
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen(client: widget.client)));
+                                Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen(client: widget.client, sessionId: session.$id,)));
+                                await _storeSessionId(session.$id);
                               } catch (e) {
                                 print('Error during login: $e'); // Add this line
                                 if (e is AppwriteException) {
@@ -375,7 +383,7 @@ class _LoginPageState extends State<LoginPage> {
                                     _resetPassword();
                                   },
                                   child: Text(
-                                    'Forgot Password?',
+                                    'Forgot Password? (Not implemented)',
                                     style: TextStyle(
                                       fontFamily: 'Outfit',
                                       fontStyle: FontStyle.normal,

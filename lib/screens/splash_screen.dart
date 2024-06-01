@@ -4,6 +4,8 @@ import 'package:video_player/video_player.dart';
 import 'package:appwrite/appwrite.dart';
 import 'login_screen.dart';
 import 'sign_screen.dart';
+import 'home_screen.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SplashScreen extends StatefulWidget {
   final bool isFirstRun;
@@ -62,30 +64,25 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     });
   }
 
-  void _navigateToNextScreen() {
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => widget.isFirstRun
-            ? LoginPage(client: widget.client)
-            : SignUpPage(client: widget.client),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          const begin = 0.0;
-          const end = 1.0;
-          const curve = Curves.easeInOut;
+  void _navigateToNextScreen() async {
+    final storage = FlutterSecureStorage();
+    String? sessionId = await storage.read(key: 'sessionId'); // Add await here
 
-          var rotateTween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-          var fadeTween = Tween(begin: 0.0, end: 1.0).chain(CurveTween(curve: curve));
-
-          return RotationTransition(
-            turns: animation.drive(rotateTween),
-            child: FadeTransition(
-              opacity: animation.drive(fadeTween),
-              child: child,
-            ),
-          );
-        },
-      ),
-    );
+    if (sessionId!= null) {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => HomeScreen(client: widget.client, sessionId: sessionId),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+        ),
+      );
+    } else {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => LoginPage(client: widget.client),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+        ),
+      );
+    }
   }
 
   @override

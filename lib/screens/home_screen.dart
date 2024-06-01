@@ -13,8 +13,9 @@ import 'package:aurora_music_v01/screens/now_playing.dart';
 
 class HomeScreen extends StatefulWidget {
   final Client client;
+  final String sessionId;
 
-  const HomeScreen({Key? key, required this.client}) : super(key: key);
+  const HomeScreen({super.key, required this.client, required this.sessionId});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -57,10 +58,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> checkForAuthentication() async {
     try {
       final session = await account!.getSession(sessionId: 'current');
+      final user = await account?.get();
       if (session != null) {
         setState(() {
           account = account;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Logged in as ${user?.email}'),
+          ),
+        );
       }
     } catch (e) {
       // If there's an error fetching the session, navigate to the login screen
@@ -108,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
 
         // Proceed if permissions are granted
-        if (audioPermissionStatus.isGranted && storagePermissionStatus.isGranted) {
+        if (audioPermissionStatus.isGranted || storagePermissionStatus.isGranted) {
           final onAudioQuery = OnAudioQuery();
           final songsResult = await onAudioQuery.querySongs();
           setState(() {
@@ -166,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final regex = RegExp(r'^v?(\d+\.\d+\.\d+)(-[a-zA-Z]+)?$');
-    final match = regex.firstMatch('v0.0.5-alpha');
+    final match = regex.firstMatch('v0.0.6-alpha');
     final currentVersion = Version.parse(match!.group(1)!);
     final isUpdateAvailable =
         latestVersion != null && latestVersion!.compareTo(currentVersion) > 0;
@@ -179,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             return AlertDialog(
               title: const Text('New version available'),
               content: const Text(
-                  'A new version of Aurora Music is available. Would you like to download it now?'),
+                  'A new version is available. Would you like to download it now?'),
               actions: [
                 TextButton(
                   onPressed: () {

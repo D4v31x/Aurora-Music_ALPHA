@@ -83,7 +83,7 @@ class _SignUpPageState extends State<SignUpPage> {
         password: password,
       );
       print('User signed up successfully!');
-      Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen(client: widget.client)));
+      Navigator.push(context, MaterialPageRoute(builder: (context) => LoginPage(client: widget.client)));
     } catch (e) {
       print('Error during sign up: $e');
       if (e is AppwriteException) {
@@ -348,7 +348,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                     _resetPassword();
                                   },
                                   child: Text(
-                                    'Forgot Password?',
+                                    'Forgot Password? (Not Implemented)',
                                     style: TextStyle(
                                       fontFamily: 'Outfit',
                                       fontStyle: FontStyle.normal,
