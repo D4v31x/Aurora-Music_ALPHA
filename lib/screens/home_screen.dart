@@ -1,14 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:aurora_music_v01/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:version/version.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart' as permissionhandler;
 import 'package:on_audio_query/on_audio_query.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:appwrite/appwrite.dart';
+import 'package:aurora_music_v01/screens/login_screen.dart';
 import 'package:aurora_music_v01/screens/now_playing.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -29,14 +28,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Version? latestVersion;
   late TabController _tabController;
   List<SongModel> songs = [];
+  String? userName;
 
   @override
   void initState() {
     super.initState();
-
-    // Initialize the Account object
     account = Account(widget.client);
-
     checkForAuthentication();
 
     Future.delayed(const Duration(milliseconds: 1500), () {
@@ -53,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     checkForNewVersion();
     fetchSongs();
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   Future<void> checkForAuthentication() async {
@@ -62,10 +60,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (session != null) {
         setState(() {
           account = account;
+          userName = user?.name;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Logged in as ${user?.email}'),
+            content: Text('Welcome back, ${userName ?? 'User'}!'),
           ),
         );
       }
@@ -85,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final versionString = data['tag_name'];
-        final regex = RegExp(r'^v?(\d+\.\d+\.\d+(-\S+)?)$');
+        final regex = RegExp(r'^v?(\d+\.\d+\.\d+)(-[a-zA-Z]+)?$');
         final match = regex.firstMatch(versionString);
         if (match != null && match.groupCount > 0) {
           final versionString = match.group(1)!;
@@ -140,9 +139,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void launchURL(String url) async {
-    if (await canLaunch(url)) {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
       try {
-        await launch(url);
+        await launchUrl(uri);
       } catch (e) {
         print('Error launching URL: $e');
       }
@@ -160,6 +160,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
     } catch (e) {
       print('Error logging out: $e');
+    }
+  }
+
+  void _openNowPlayingScreen(SongModel song) {
+    int index = songs.indexWhere((s) => s.id == song.id);
+    if (index != -1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => NowPlayingScreen(
+            songs: songs,
+            currentIndex: index,
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: Song not found in list')),
+      );
     }
   }
 
@@ -208,8 +227,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       });
     }
 
-    _tabController = TabController(length: 3, vsync: this);
-
     return account != null
         ? Stack(
       children: [
@@ -238,9 +255,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: AnimatedOpacity(
                     opacity: isWelcomeBackVisible ? 1.0 : 0.0,
                     duration: const Duration(seconds: 1),
-                    child: const Text(
-                      'Welcome Back',
-                      style: TextStyle(
+                    child: Text(
+                      'Welcome Back${userName != null ? ', $userName' : ''}',
+                      style: const TextStyle(
                           fontFamily: 'Outfit',
                           fontStyle: FontStyle.normal,
                           color: Colors.white,
@@ -274,33 +291,52 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 child: TabBar(
                   controller: _tabController,
+                  dividerColor: Colors.transparent,
                   indicator: OutlineIndicator(
                     color: Colors.white,
                     strokeWidth: 2,
-                    text: 'Custom Indicator',
+                    text: '',
                     radius: Radius.circular(24),
                   ),
-                  tabs: const [
+                  tabs: [
                     Tab(
-                      icon: Icon(
-                        Icons.music_note,
-                        color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Text(
+                          'Songs',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
                       ),
-                      text: 'Songs',
                     ),
                     Tab(
-                      icon: Icon(
-                        Icons.playlist_play,
-                        color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Text(
+                          'Playlist',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
                       ),
-                      text: 'Playlist',
                     ),
                     Tab(
-                      icon: Icon(
-                        Icons.settings,
-                        color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Text(
+                          'Settings',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
                       ),
-                      text: 'Settings',
                     ),
                   ],
                 ),
@@ -333,38 +369,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       style: const TextStyle(color: Colors.white),
                     ),
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => NowPlayingScreen(currentSong: song),
-                        ),
-                      );
+                      _openNowPlayingScreen(song);
                     },
                   );
                 },
               ),
               const Center(
-                child: Text('Playlist'),
+                child: Text('Playlist', style: TextStyle(color: Colors.white)),
               ),
               ListView(
                 children: [
                   ListTile(
                     title: const Text(
                       'Log Out',
-                      style: TextStyle(color: Colors.white), // Change the color here
+                      style: TextStyle(color: Colors.white),
                     ),
                     subtitle: const Text(
                       'User settings',
-                      style: TextStyle(color: Colors.grey), // Change the color here
+                      style: TextStyle(color: Colors.grey),
                     ),
-                    leading: const Icon(Icons.logout, color: Colors.white), // Optional: Change icon color as well
+                    leading: const Icon(Icons.logout, color: Colors.white),
                     onTap: logout,
                   ),
                 ],
               ),
             ],
           ),
-
         ),
       ],
     )
@@ -391,13 +421,13 @@ class OutlineIndicator extends Decoration {
   final Radius radius;
 
   @override
-  BoxPainter createBoxPainter([VoidCallback? onChanged]) {
+  BoxPainter createBoxPainter([VoidCallback? onChange]) {
     return _OutlinePainter(
       color: color,
       strokeWidth: strokeWidth,
       text: text,
       radius: radius,
-      onChange: onChanged,
+      onChange: onChange,
     );
   }
 }
@@ -424,28 +454,15 @@ class _OutlinePainter extends BoxPainter {
   @override
   void paint(Canvas canvas, Offset offset, ImageConfiguration configuration) {
     assert(configuration.size != null);
-    var rect = offset & configuration.size!;
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      textAlign: TextAlign.center,
-      textDirection: TextDirection.ltr,
+    const Radius radius = Radius.circular(24);
+    final Rect rect = offset & configuration.size!;
+    final RRect rrect = RRect.fromRectAndCorners(
+      rect,
+      topLeft: radius,
+      topRight: radius,
+      bottomLeft: radius,
+      bottomRight: radius,
     );
-    textPainter.layout();
-    final textWidth = textPainter.width;
-    final indicatorWidth = textWidth + 16; // Add some padding to the indicator
-    final indicatorRect = Rect.fromLTWH(
-      rect.left + (rect.width - indicatorWidth) / 2,
-      rect.top + rect.height - strokeWidth,
-      indicatorWidth,
-      strokeWidth,
-    );
-    var rrect = RRect.fromRectAndRadius(indicatorRect, radius);
     canvas.drawRRect(rrect, _paint);
   }
 }
