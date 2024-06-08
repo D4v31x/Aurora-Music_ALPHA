@@ -1,95 +1,92 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:rive/rive.dart';
 import 'package:video_player/video_player.dart';
 import 'package:appwrite/appwrite.dart';
-import 'login_screen.dart';
-import 'sign_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'home_screen.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'welcome_screen.dart';
 
 class SplashScreen extends StatefulWidget {
-  final bool isFirstRun;
   final Client client;
 
-  const SplashScreen({required this.isFirstRun, required this.client, super.key});
+  const SplashScreen({super.key, required this.client, required bool isFirstRun});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  _SplashScreenState createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
+class _SplashScreenState extends State<SplashScreen> {
   late VideoPlayerController _videoController;
+  late RiveAnimationController _riveController;
+  bool _isRiveCompleted = false;
+  bool _isFirstRun = true;
 
   @override
   void initState() {
     super.initState();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: [SystemUiOverlay.top]);
-
-    // Initialize the video controller
-    _videoController = VideoPlayerController.asset('assets/videos/longsplash.mp4')
-      ..initialize().then((_) {
-        setState(() {}); // Ensure the first frame is shown after the video is initialized
-        _videoController.setVolume(0); // Mute the video
-        _videoController.play();
-      }).catchError((error) {
-        print("Error initializing video player: $error");
-      });
-
-    // Initialize the animation controller
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 500),
-      vsync: this,
-    );
-
-    // Define the fade animation
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    );
-
-    // Start the splash screen
-    _startSplashScreen();
+    _initializeVideo();
+    _checkFirstRun();
   }
 
-  void _startSplashScreen() async {
-    await Future.delayed(const Duration(milliseconds: 3000));
-    _animationController.forward();
-    // Add a listener to navigate to the next screen after the animation completes
-    _animationController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
+  void _initializeVideo() {
+    _videoController = VideoPlayerController.asset("assets/videos/Back.mp4")
+      ..initialize().then((_) {
+        setState(() {
+          _videoController.play();
+          _videoController.setLooping(true);
+        });
+      });
+
+    _riveController = SimpleAnimation('Timeline 2');
+    _riveController.isActiveChanged.addListener(_onRiveAnimationCompleted);
+  }
+
+  Future<void> _checkFirstRun() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    _isFirstRun = prefs.getBool('isFirstRun') ?? true;
+
+    if (_isFirstRun) {
+      await prefs.setBool('isFirstRun', false);
+    }
+  }
+
+  void _onRiveAnimationCompleted() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_riveController.isActive) {
+        setState(() {
+          _isRiveCompleted = true;
+        });
         _navigateToNextScreen();
       }
     });
   }
 
-  void _navigateToNextScreen() async {
-    final storage = FlutterSecureStorage();
-    String? sessionId = await storage.read(key: 'sessionId'); // Add await here
+  void _navigateToNextScreen() {
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation1, animation2) =>
+        _isFirstRun ? WelcomeScreen(client: widget.client) : HomeScreen(client: widget.client),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = 0.0;
+          const end = 1.0;
+          const duration = Duration(seconds: 2);
+          final curvedAnimation = CurvedAnimation(parent: animation, curve: Curves.easeInOut);
 
-    if (sessionId!= null) {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => HomeScreen(client: widget.client, sessionId: sessionId),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
-        ),
-      );
-    } else {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => LoginPage(client: widget.client),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
-        ),
-      );
-    }
+          return FadeTransition(
+            opacity: Tween(begin: begin, end: end).animate(curvedAnimation),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
     _videoController.dispose();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+    _riveController.isActiveChanged.removeListener(_onRiveAnimationCompleted);
     super.dispose();
   }
 
@@ -98,21 +95,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     return Scaffold(
       body: Stack(
         children: [
-          if (_videoController.value.isInitialized)
-            Positioned.fill(
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: _videoController.value.size.width,
-                  height: _videoController.value.size.height,
-                  child: VideoPlayer(_videoController),
-                ),
-              ),
-            ),
-          FadeTransition(
-            opacity: _fadeAnimation,
-            child: Container(
-              color: Colors.transparent,
+          VideoPlayer(_videoController),
+          Center(
+            child: RiveAnimation.asset(
+              "assets/animations/untitled.riv",
+              controllers: [_riveController],
             ),
           ),
         ],

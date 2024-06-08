@@ -1,12 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:blur/blur.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
 
@@ -14,7 +12,7 @@ class NowPlayingScreen extends StatefulWidget {
   final List<SongModel> songs;
   final int currentIndex;
 
-  NowPlayingScreen({required this.songs, required this.currentIndex});
+  const NowPlayingScreen({super.key, required this.songs, required this.currentIndex});
 
   @override
   _NowPlayingScreenState createState() => _NowPlayingScreenState();
@@ -142,7 +140,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   }
 
   Future<String?> _getArtworkUrl(SongModel song) async {
-    final apiKey = '7a9dd38921cc44bfae9363a0a4f3e387';
+    const apiKey = '7a9dd38921cc44bfae9363a0a4f3e387';
     final artist = song.artist ?? '';
     final title = song.title ?? '';
     final url =
@@ -195,7 +193,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text('Now Playing'),
+        title: const Text('Now Playing'),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -211,7 +209,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
           final hasArtwork = artworkFile != null;
           final artworkWidget = hasArtwork
               ? Image.file(
-            artworkFile!,
+            artworkFile,
             fit: BoxFit.cover,
             width: double.infinity,
             height: double.infinity,
@@ -221,7 +219,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
           return Stack(
             children: [
               // Fullscreen background image with blur effect
-              Container(
+              SizedBox(
                 width: double.infinity,
                 height: double.infinity,
                 child: artworkWidget,
@@ -244,20 +242,20 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                 color: Colors.black.withOpacity(0.3),
                                 spreadRadius: 5,
                                 blurRadius: 30,
-                                offset: Offset(0, 3),
+                                offset: const Offset(0, 3),
                               ),
                             ],
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: AnimatedSwitcher(
-                              duration: Duration(milliseconds: 500),
+                              duration: const Duration(milliseconds: 500),
                               transitionBuilder: (Widget child, Animation<double> animation) {
                                 return FadeTransition(opacity: animation, child: child);
                               },
                               child: hasArtwork
                                   ? Image.file(
-                                artworkFile!,
+                                artworkFile,
                                 key: ValueKey<String>(artworkFile.path),
                                 fit: BoxFit.cover,
                                 width: double.infinity,
@@ -270,14 +268,14 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                       ),
                     ),
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
                   // Song title
                   AnimatedSwitcher(
-                    duration: Duration(milliseconds: 500),
+                    duration: const Duration(milliseconds: 500),
                     child: Text(
                       currentSong?.title ?? 'No song playing',
                       key: ValueKey<int>(_currentIndex),
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -285,21 +283,21 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   // Artist name
                   AnimatedSwitcher(
-                    duration: Duration(milliseconds: 500),
+                    duration: const Duration(milliseconds: 500),
                     child: Text(
                       currentSong?.artist ?? 'Unknown artist',
                       key: ValueKey<int>(_currentIndex),
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 18,
                         color: Colors.white,
                       ),
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
                   // Timeline
                   StreamBuilder<Duration?>(
                     stream: _audioPlayer.durationStream,
@@ -331,11 +329,11 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                                   children: [
                                     Text(
                                       _formatDuration(position),
-                                      style: TextStyle(color: Colors.white),
+                                      style: const TextStyle(color: Colors.white),
                                     ),
                                     Text(
                                       _formatDuration(duration),
-                                      style: TextStyle(color: Colors.white),
+                                      style: const TextStyle(color: Colors.white),
                                     ),
                                   ],
                                 ),
@@ -355,7 +353,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                         onPressed: _toggleShuffle,
                       ),
                       IconButton(
-                        icon: Icon(Icons.skip_previous, color: Colors.white),
+                        icon: const Icon(Icons.skip_previous, color: Colors.white),
                         onPressed: _back,
                       ),
                       IconButton(
@@ -363,7 +361,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                         onPressed: _pause,
                       ),
                       IconButton(
-                        icon: Icon(Icons.skip_next, color: Colors.white),
+                        icon: const Icon(Icons.skip_next, color: Colors.white),
                         onPressed: _skip,
                       ),
                       IconButton(

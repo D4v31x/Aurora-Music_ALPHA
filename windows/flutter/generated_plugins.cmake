@@ -5,10 +5,9 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_windows
   connectivity_plus
-  firebase_auth
-  firebase_core
   flutter_secure_storage_windows
   permission_handler_windows
+  rive_common
   url_launcher_windows
   window_to_front
 )

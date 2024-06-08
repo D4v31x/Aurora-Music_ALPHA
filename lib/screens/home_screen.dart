@@ -7,14 +7,15 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart' as permissionhandler;
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:appwrite/appwrite.dart';
-import 'package:aurora_music_v01/screens/login_screen.dart';
 import 'package:aurora_music_v01/screens/now_playing.dart';
+import 'package:palette_generator/palette_generator.dart';
+
+import '../localization/app_localizations.dart';
 
 class HomeScreen extends StatefulWidget {
   final Client client;
-  final String sessionId;
 
-  const HomeScreen({super.key, required this.client, required this.sessionId});
+  const HomeScreen({super.key, required this.client});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -29,12 +30,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late TabController _tabController;
   List<SongModel> songs = [];
   String? userName;
+  SongModel? currentSong;
+  Color? dominantColor;
+  Color? textColor;
+  AnimationController? _animationController;
+  Animation<Offset>? _slideAnimation;
 
   @override
   void initState() {
     super.initState();
     account = Account(widget.client);
-    checkForAuthentication();
 
     Future.delayed(const Duration(milliseconds: 1500), () {
       setState(() {
@@ -51,30 +56,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     checkForNewVersion();
     fetchSongs();
     _tabController = TabController(length: 3, vsync: this);
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animationController!,
+      curve: Curves.easeInOut,
+    ));
   }
 
-  Future<void> checkForAuthentication() async {
-    try {
-      final session = await account!.getSession(sessionId: 'current');
-      final user = await account?.get();
-      if (session != null) {
-        setState(() {
-          account = account;
-          userName = user?.name;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Welcome back, ${userName ?? 'User'}!'),
-          ),
-        );
-      }
-    } catch (e) {
-      // If there's an error fetching the session, navigate to the login screen
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => LoginPage(client: widget.client)),
-      );
-    }
+  @override
+  void dispose() {
+    _animationController?.dispose();
+    super.dispose();
   }
 
   Future<void> checkForNewVersion() async {
@@ -122,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           });
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Permissions denied'),
             ),
           );
@@ -131,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } catch (e) {
       print('Error fetching songs: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Error fetching songs'),
         ),
       );
@@ -154,30 +154,56 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> logout() async {
     try {
       await account!.deleteSession(sessionId: 'current');
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => LoginPage(client: widget.client)),
-      );
+      // Handle logout actions (e.g., navigate to a different screen or show a message)
     } catch (e) {
       print('Error logging out: $e');
     }
   }
 
-  void _openNowPlayingScreen(SongModel song) {
+  Future<void> _extractDominantColor(SongModel song) async {
+    final image = await OnAudioQuery().queryArtwork(
+      song.id,
+      ArtworkType.AUDIO,
+    );
+    if (image != null) {
+      final paletteGenerator = await PaletteGenerator.fromImageProvider(
+        MemoryImage(image),
+      );
+      setState(() {
+        dominantColor = paletteGenerator.dominantColor?.color ?? Colors.black;
+        textColor = dominantColor!.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+      });
+    } else {
+      setState(() {
+        dominantColor = Colors.black;
+        textColor = Colors.white;
+      });
+    }
+  }
+
+  void _openNowPlayingScreen(SongModel song) async {
+    await _animationController?.forward();
     int index = songs.indexWhere((s) => s.id == song.id);
     if (index != -1) {
       Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => NowPlayingScreen(
-            songs: songs,
-            currentIndex: index,
-          ),
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              NowPlayingScreen(
+                songs: songs,
+                currentIndex: index,
+              ),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: _slideAnimation!,
+              child: child,
+            );
+          },
         ),
-      );
+      ).then((value) => _animationController?.reverse());
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: Song not found in list')),
+        const SnackBar(content: Text('Error: Song not found in list')),
       );
     }
   }
@@ -186,6 +212,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void didChangeDependencies() {
     super.didChangeDependencies();
     isDarkMode = MediaQuery.of(context).platformBrightness == Brightness.dark;
+  }
+
+  void _onSongTap(SongModel song) async {
+    setState(() {
+      currentSong = song;
+    });
+    await _extractDominantColor(song);
   }
 
   @override
@@ -227,8 +260,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       });
     }
 
-    return account != null
-        ? Stack(
+    return Stack(
       children: [
         Container(
           width: double.infinity,
@@ -256,7 +288,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     opacity: isWelcomeBackVisible ? 1.0 : 0.0,
                     duration: const Duration(seconds: 1),
                     child: Text(
-                      'Welcome Back${userName != null ? ', $userName' : ''}',
+                      AppLocalizations.of(context).translate('welcome_back'),
                       style: const TextStyle(
                           fontFamily: 'Outfit',
                           fontStyle: FontStyle.normal,
@@ -270,9 +302,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: AnimatedOpacity(
                     opacity: isAuroraMusicVisible ? 1.0 : 0.0,
                     duration: const Duration(seconds: 1),
-                    child: const Text(
-                      'Aurora Music',
-                      style: TextStyle(
+                    child: Text(
+                      AppLocalizations.of(context).translate('aurora_music'),
+                      style: const TextStyle(
                           fontFamily: 'Outfit',
                           fontStyle: FontStyle.normal,
                           color: Colors.white,
@@ -284,15 +316,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(50),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                ),
+              preferredSize: const Size.fromHeight(48.0),
+              child: Align(
+                alignment: Alignment.center,
                 child: TabBar(
                   controller: _tabController,
                   dividerColor: Colors.transparent,
-                  indicator: OutlineIndicator(
+                  indicator: const OutlineIndicator(
                     color: Colors.white,
                     strokeWidth: 2,
                     text: '',
@@ -303,8 +333,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),
                         child: Text(
-                          'Songs',
-                          style: TextStyle(
+                          AppLocalizations.of(context).translate('songs'),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
                             fontFamily: 'Outfit',
@@ -316,8 +346,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),
                         child: Text(
-                          'Playlist',
-                          style: TextStyle(
+                          AppLocalizations.of(context).translate('playlists'),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
                             fontFamily: 'Outfit',
@@ -329,8 +359,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),
                         child: Text(
-                          'Settings',
-                          style: TextStyle(
+                          AppLocalizations.of(context).translate('settings'),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 16,
                             fontFamily: 'Outfit',
@@ -343,66 +373,127 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
           ),
-          body: TabBarView(
-            controller: _tabController,
+          body: Stack(
             children: [
-              ListView.builder(
-                itemCount: songs.length,
-                itemBuilder: (context, index) {
-                  final song = songs[index];
-                  return ListTile(
-                    leading: QueryArtworkWidget(
-                      id: song.id,
-                      type: ArtworkType.AUDIO,
-                      artworkFit: BoxFit.cover,
-                      nullArtworkWidget: const Icon(
-                        Icons.music_note,
-                        color: Colors.white,
-                      ),
-                    ),
-                    title: Text(
-                      song.title.toString(),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    subtitle: Text(
-                      song.artist.toString(),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    onTap: () {
-                      _openNowPlayingScreen(song);
-                    },
-                  );
-                },
-              ),
-              const Center(
-                child: Text('Playlist', style: TextStyle(color: Colors.white)),
-              ),
-              ListView(
+              TabBarView(
+                controller: _tabController,
                 children: [
-                  ListTile(
-                    title: const Text(
-                      'Log Out',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    subtitle: const Text(
-                      'User settings',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                    leading: const Icon(Icons.logout, color: Colors.white),
-                    onTap: logout,
+                  ListView.builder(
+                    itemCount: songs.length,
+                    itemBuilder: (context, index) {
+                      final song = songs[index];
+                      return ListTile(
+                        leading: QueryArtworkWidget(
+                          id: song.id,
+                          type: ArtworkType.AUDIO,
+                          artworkFit: BoxFit.cover,
+                          nullArtworkWidget: const Icon(
+                            Icons.music_note,
+                            color: Colors.white,
+                          ),
+                        ),
+                        title: Text(
+                          song.title.toString(),
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        subtitle: Text(
+                          song.artist.toString(),
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        onTap: () {
+                          _onSongTap(song);
+                        },
+                      );
+                    },
+                  ),
+                  Center(
+                    child: Text(AppLocalizations.of(context).translate('playlists'),
+                        style: const TextStyle(color: Colors.white)),
+                  ),
+                  ListView(
+                    children: [
+                      ListTile(
+                        title: const Text(
+                          'Log Out',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        subtitle: Text(
+                          AppLocalizations.of(context).translate('user_settings'),
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                        leading: const Icon(Icons.logout, color: Colors.white),
+                        onTap: logout,
+                      ),
+                    ],
                   ),
                 ],
               ),
+              if (currentSong != null)
+                Positioned(
+                  bottom: 16.0,
+                  left: 16.0,
+                  right: 16.0,
+                  child: GestureDetector(
+                    onTap: () => _openNowPlayingScreen(currentSong!),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 500),
+                      padding: const EdgeInsets.all(8.0),
+                      decoration: BoxDecoration(
+                        color: dominantColor ?? Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(20.0),
+                      ),
+                      child: Row(
+                        children: [
+                          QueryArtworkWidget(
+                            id: currentSong!.id,
+                            type: ArtworkType.AUDIO,
+                            artworkFit: BoxFit.cover,
+                            artworkWidth: 50,
+                            artworkHeight: 50,
+                            nullArtworkWidget: const Icon(
+                              Icons.music_note,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 8.0),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  currentSong!.title,
+                                  style: TextStyle(
+                                      color: textColor ?? Colors.white, fontSize: 16.0),
+                                ),
+                                Text(
+                                  currentSong!.artist ?? 'Unknown Artist',
+                                  style: TextStyle(
+                                      color: textColor?.withOpacity(0.7) ?? Colors.grey, fontSize: 14.0),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.play_arrow, color: textColor ?? Colors.white),
+                            onPressed: () {
+                              // Handle play button press
+                            },
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.skip_next, color: textColor ?? Colors.white),
+                            onPressed: () {
+                              // Handle next button press
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
       ],
-    )
-        : Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
     );
   }
 }
