@@ -11,25 +11,23 @@ import 'locale_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  bool isFirstRun = prefs.getBool('isFirstRun') ?? true;
   await RiveFile.initialize();
 
   Client client = Client()
     ..setEndpoint('https://cloud.appwrite.io/v1')
     ..setProject('663e1a92003d390b8b2f');
 
+  SharedPreferences prefs = await SharedPreferences.getInstance();
   String? languageCode = prefs.getString('languageCode') ?? 'en';
 
-  runApp(MyApp(isFirstRun: isFirstRun, client: client, languageCode: languageCode));
+  runApp(MyApp(client: client, languageCode: languageCode));
 }
 
 class MyApp extends StatefulWidget {
-  final bool isFirstRun;
   final Client client;
   final String languageCode;
 
-  const MyApp({super.key, required this.isFirstRun, required this.client, required this.languageCode});
+  const MyApp({super.key, required this.client, required this.languageCode});
 
   @override
   _MyAppState createState() => _MyAppState();
@@ -71,7 +69,7 @@ class _MyAppState extends State<MyApp> {
           ui.Locale('en', ''),
           ui.Locale('cs', ''),
         ],
-        home: SplashScreen(isFirstRun: widget.isFirstRun, client: widget.client),
+        home: SplashScreen(client: widget.client),
       ),
     );
   }

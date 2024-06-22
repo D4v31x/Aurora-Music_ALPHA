@@ -1,4 +1,5 @@
 import 'package:appwrite/appwrite.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
 import 'package:permission_handler/permission_handler.dart' as handler;
@@ -9,7 +10,7 @@ import 'home_screen.dart';
 class WelcomeScreen extends StatefulWidget {
   final Client client;
 
-  const WelcomeScreen({super.key, required this.client});
+  const WelcomeScreen({Key? key, required this.client}) : super(key: key);
 
   @override
   _WelcomeScreenState createState() => _WelcomeScreenState();
@@ -19,24 +20,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   late VideoPlayerController _videoController;
   late RiveAnimationController _riveController;
   late RiveAnimationController _permissionRiveController;
+  bool _isVideoInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _checkFirstRun();
-  }
-
-  Future<void> _checkFirstRun() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    bool isFirstRun = prefs.getBool('isFirstRun') ?? true;
-
-    if (isFirstRun) {
-      await prefs.setBool('isFirstRun', false);
-      _initializeVideo();
-      _initializeRive();
-    } else {
-      _navigateToHome();
-    }
+    _initializeVideo();
+    _initializeRive();
   }
 
   void _initializeVideo() {
@@ -45,12 +35,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         setState(() {
           _videoController.play();
           _videoController.setLooping(true);
+          _isVideoInitialized = true;
         });
       });
   }
 
   void _initializeRive() {
-    _riveController = SimpleAnimation('Timeline 1'); // Adjust to match your Rive animation
+    _riveController = SimpleAnimation('Timeline 1');
   }
 
   Future<void> _checkPermissions() async {
@@ -127,34 +118,36 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
+      body: _isVideoInitialized
+          ? Stack(
         children: [
           SizedBox.expand(
             child: FittedBox(
               fit: BoxFit.cover,
               child: SizedBox(
-                width: _videoController.value.size.width ?? 0,
-                height: _videoController.value.size.height ?? 0,
+                width: _videoController.value.size.width,
+                height: _videoController.value.size.height,
                 child: VideoPlayer(_videoController),
               ),
             ),
           ),
           Center(
             child: SizedBox(
-              width: 800, // Adjust as needed
-              height: 800, // Adjust as needed
+              width: 800,
+              height: 800,
               child: RiveAnimation.asset(
                 'assets/animations/welcome.riv',
                 controllers: [_riveController],
                 onInit: (_) => Future.delayed(
-                  const Duration(seconds: 6), // Adjust to match animation length
+                  const Duration(seconds: 6),
                   _checkPermissions,
                 ),
               ),
             ),
           ),
         ],
-      ),
+      )
+          : Center(child: CircularProgressIndicator()),
     );
   }
 

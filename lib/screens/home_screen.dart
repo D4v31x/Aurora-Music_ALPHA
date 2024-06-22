@@ -15,6 +15,7 @@ import '../localization/app_localizations.dart';
 class HomeScreen extends StatefulWidget {
   final Client client;
 
+
   const HomeScreen({super.key, required this.client});
 
   @override

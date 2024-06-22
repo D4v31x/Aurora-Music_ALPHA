@@ -1,7 +1,7 @@
+import 'package:appwrite/appwrite.dart';
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
 import 'package:video_player/video_player.dart';
-import 'package:appwrite/appwrite.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'home_screen.dart';
 import 'welcome_screen.dart';
@@ -9,7 +9,7 @@ import 'welcome_screen.dart';
 class SplashScreen extends StatefulWidget {
   final Client client;
 
-  const SplashScreen({super.key, required this.client, required bool isFirstRun});
+  const SplashScreen({super.key, required this.client});
 
   @override
   _SplashScreenState createState() => _SplashScreenState();
@@ -19,13 +19,12 @@ class _SplashScreenState extends State<SplashScreen> {
   late VideoPlayerController _videoController;
   late RiveAnimationController _riveController;
   bool _isRiveCompleted = false;
-  bool _isFirstRun = true;
+  bool _isVideoInitialized = false;
 
   @override
   void initState() {
     super.initState();
     _initializeVideo();
-    _checkFirstRun();
   }
 
   void _initializeVideo() {
@@ -34,20 +33,12 @@ class _SplashScreenState extends State<SplashScreen> {
         setState(() {
           _videoController.play();
           _videoController.setLooping(true);
+          _isVideoInitialized = true;
         });
       });
 
     _riveController = SimpleAnimation('Timeline 2');
     _riveController.isActiveChanged.addListener(_onRiveAnimationCompleted);
-  }
-
-  Future<void> _checkFirstRun() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    _isFirstRun = prefs.getBool('isFirstRun') ?? true;
-
-    if (_isFirstRun) {
-      await prefs.setBool('isFirstRun', false);
-    }
   }
 
   void _onRiveAnimationCompleted() {
@@ -56,21 +47,19 @@ class _SplashScreenState extends State<SplashScreen> {
         setState(() {
           _isRiveCompleted = true;
         });
-        _navigateToNextScreen();
+        _navigateToWelcomeScreen();
       }
     });
   }
 
-  void _navigateToNextScreen() {
+  void _navigateToWelcomeScreen() {
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation1, animation2) =>
-        _isFirstRun ? WelcomeScreen(client: widget.client) : HomeScreen(client: widget.client),
+        pageBuilder: (context, animation1, animation2) => WelcomeScreen(client: widget.client),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           const begin = 0.0;
           const end = 1.0;
-          const duration = Duration(seconds: 2);
           final curvedAnimation = CurvedAnimation(parent: animation, curve: Curves.easeInOut);
 
           return FadeTransition(
@@ -83,6 +72,7 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 
+
   @override
   void dispose() {
     _videoController.dispose();
@@ -93,7 +83,8 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
+      body: _isVideoInitialized
+          ? Stack(
         children: [
           VideoPlayer(_videoController),
           Center(
@@ -103,7 +94,8 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
           ),
         ],
-      ),
+      )
+          : Center(child: CircularProgressIndicator()),
     );
   }
 }
