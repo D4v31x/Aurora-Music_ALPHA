@@ -9,5 +9,8 @@
   "playlists": "Playlists",
   "settings": "Settings",
   "user_settings": "User settings",
-  "next": "Next"
+  "next": "Next",
+  "quick_access": "Quick Access",
+  "suggested_tracks": "Suggested Tracks",
+  "suggested_artists": "Suggested Artists"
 }

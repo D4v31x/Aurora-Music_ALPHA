@@ -9,12 +9,13 @@ import 'package:on_audio_query/on_audio_query.dart';
 import 'package:appwrite/appwrite.dart';
 import 'package:aurora_music_v01/screens/now_playing.dart';
 import 'package:palette_generator/palette_generator.dart';
+import 'dart:ui';
+import 'dart:typed_data';
 
 import '../localization/app_localizations.dart';
 
 class HomeScreen extends StatefulWidget {
   final Client client;
-
 
   const HomeScreen({super.key, required this.client});
 
@@ -261,20 +262,45 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       });
     }
 
+    Widget buildBackground() {
+      return FutureBuilder<Uint8List?>(
+        future: currentSong != null
+            ? OnAudioQuery().queryArtwork(currentSong!.id, ArtworkType.AUDIO)
+            : Future.value(null),
+        builder: (context, snapshot) {
+          ImageProvider backgroundImage;
+          if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
+            backgroundImage = MemoryImage(snapshot.data!);
+          } else {
+            backgroundImage = AssetImage(isDarkMode
+                ? 'assets/images/background/dark_back.jpg'
+                : 'assets/images/background/light_back.jpg');
+          }
+
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: backgroundImage,
+                fit: BoxFit.cover,
+              ),
+            ),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                color: Colors.black.withOpacity(0.5),
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+
     return Stack(
       children: [
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.transparent,
-            image: DecorationImage(
-              image: AssetImage(isDarkMode
-                  ? 'assets/images/background/dark_back.jpg'
-                  : 'assets/images/background/light_back.jpg'),
-              fit: BoxFit.cover,
-            ),
-          ),
-        ),
+        buildBackground(),
         Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
@@ -374,131 +400,194 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
           ),
-          body: Stack(
+          body: TabBarView(
+            controller: _tabController,
             children: [
-              TabBarView(
-                controller: _tabController,
-                children: [
-                  ListView.builder(
-                    itemCount: songs.length,
-                    itemBuilder: (context, index) {
-                      final song = songs[index];
-                      return ListTile(
-                        leading: QueryArtworkWidget(
-                          id: song.id,
-                          type: ArtworkType.AUDIO,
-                          artworkFit: BoxFit.cover,
-                          nullArtworkWidget: const Icon(
-                            Icons.music_note,
-                            color: Colors.white,
-                          ),
-                        ),
-                        title: Text(
-                          song.title.toString(),
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                        subtitle: Text(
-                          song.artist.toString(),
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                        onTap: () {
-                          _onSongTap(song);
-                        },
-                      );
-                    },
-                  ),
-                  Center(
-                    child: Text(AppLocalizations.of(context).translate('playlists'),
-                        style: const TextStyle(color: Colors.white)),
-                  ),
-                  ListView(
-                    children: [
-                      ListTile(
-                        title: const Text(
-                          'Log Out',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        subtitle: Text(
-                          AppLocalizations.of(context).translate('user_settings'),
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                        leading: const Icon(Icons.logout, color: Colors.white),
-                        onTap: logout,
-                      ),
-                    ],
-                  ),
-                ],
+              buildHomeTab(),
+              const Center(
+                child: Text('Library'),
               ),
-              if (currentSong != null)
-                Positioned(
-                  bottom: 16.0,
-                  left: 16.0,
-                  right: 16.0,
-                  child: GestureDetector(
-                    onTap: () => _openNowPlayingScreen(currentSong!),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 500),
-                      padding: const EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(
-                        color: dominantColor ?? Colors.black.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(20.0),
-                      ),
-                      child: Row(
-                        children: [
-                          QueryArtworkWidget(
-                            id: currentSong!.id,
-                            type: ArtworkType.AUDIO,
-                            artworkFit: BoxFit.cover,
-                            artworkWidth: 50,
-                            artworkHeight: 50,
-                            nullArtworkWidget: const Icon(
-                              Icons.music_note,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: 8.0),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  currentSong!.title,
-                                  style: TextStyle(
-                                      color: textColor ?? Colors.white, fontSize: 16.0),
-                                ),
-                                Text(
-                                  currentSong!.artist ?? 'Unknown Artist',
-                                  style: TextStyle(
-                                      color: textColor?.withOpacity(0.7) ?? Colors.grey, fontSize: 14.0),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.play_arrow, color: textColor ?? Colors.white),
-                            onPressed: () {
-                              // Handle play button press
-                            },
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.skip_next, color: textColor ?? Colors.white),
-                            onPressed: () {
-                              // Handle next button press
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+              const Center(
+                child: Text('Discover'),
+              ),
             ],
           ),
         ),
       ],
     );
   }
-}
 
+  Widget glassmorphicContainer({required Widget child}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(15),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),
+              width: 1.5,
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget buildHomeTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 30.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            AppLocalizations.of(context).translate('quick_access'),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 10.0),
+          buildQuickAccessSection(),
+          const SizedBox(height: 30.0),
+          Text(
+            AppLocalizations.of(context).translate('suggested_tracks'),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 10.0),
+          buildSuggestedTracksSection(),
+          const SizedBox(height: 30.0),
+          Text(
+            AppLocalizations.of(context).translate('suggested_artists'),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 10.0),
+          buildSuggestedArtistsSection(),
+        ],
+      ),
+    );
+  }
+
+                      Widget buildQuickAccessSection() {
+                        final favoritesPlaylist = 'Oblíbené';
+                        final recentlyListenedPlaylists = ['Playlist 1']; // This should be dynamically populated
+
+                        if (favoritesPlaylist.isNotEmpty || recentlyListenedPlaylists.isNotEmpty) {
+                          return Column(
+                            children: [
+                              if (favoritesPlaylist.isNotEmpty)
+                                glassmorphicContainer(
+                                  child: ListTile(
+                                    leading: const Icon(Icons.favorite, color: Colors.pink),
+                                    title: Text(favoritesPlaylist, style: const TextStyle(color: Colors.white)),
+                                    onTap: () {
+                                      // Navigate to the favorites playlist
+                                    },
+                                  ),
+                                ),
+                              if (recentlyListenedPlaylists.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: glassmorphicContainer(
+                                    child: ListTile(
+                                      leading: const Icon(Icons.history, color: Colors.white),
+                                      title: Text(recentlyListenedPlaylists[0], style: const TextStyle(color: Colors.white)),
+                                      onTap: () {
+                                        // Navigate to the recently listened playlist
+                                      },
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        } else {
+                          return glassmorphicContainer(
+                            child: const Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: Text('Žádná data k zobrazení', style: TextStyle(color: Colors.white)),
+                            ),
+                          );
+                        }
+                      }
+
+
+  Widget buildSuggestedTracksSection() {
+    if (songs.isNotEmpty) {
+      final randomSongs = (songs.toList()..shuffle()).take(3).toList();
+      return Column(
+        children: randomSongs.map((song) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: glassmorphicContainer(
+              child: ListTile(
+                leading: QueryArtworkWidget(
+                  id: song.id,
+                  type: ArtworkType.AUDIO,
+                  nullArtworkWidget: const Icon(Icons.music_note, color: Colors.white),
+                ),
+                title: Text(song.title, style: const TextStyle(color: Colors.white)),
+                subtitle: Text(song.artist ?? 'Unknown Artist', style: const TextStyle(color: Colors.grey)),
+                trailing: const Icon(Icons.favorite_border, color: Colors.white),
+                onTap: () {
+                  _onSongTap(song);
+                  _openNowPlayingScreen(song);
+                },
+              ),
+            ),
+          );
+        }).toList(),
+      );
+    } else {
+      return glassmorphicContainer(
+        child: const Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text('Žádná data k zobrazení', style: TextStyle(color: Colors.white)),
+        ),
+      );
+    }
+  }
+
+  Widget buildSuggestedArtistsSection() {
+    if (songs.isNotEmpty) {
+      final uniqueArtists = songs
+          .map((song) => song.artist)
+          .where((artist) => artist != null)
+          .toSet()
+          .toList();
+
+      if (uniqueArtists.isNotEmpty) {
+        final randomArtists = (uniqueArtists.toList()..shuffle()).take(3).toList();
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: randomArtists.map((artist) {
+            return glassmorphicContainer(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 40,
+                      backgroundImage: NetworkImage('https://example.com/artist_image.jpg'), // Replace with actual artist image URL
+                      child: artist!.isNotEmpty ? null : const Icon(Icons.person, size: 40, color: Colors.white),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(artist, style: const TextStyle(color: Colors.white)),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      }
+    }
+    return glassmorphicContainer(
+      child: const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Text('Žádná data k zobrazení', style: TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+}
 class OutlineIndicator extends Decoration {
   const OutlineIndicator({
     this.color = Colors.white,
@@ -523,6 +612,7 @@ class OutlineIndicator extends Decoration {
     );
   }
 }
+
 
 class _OutlinePainter extends BoxPainter {
   _OutlinePainter({
