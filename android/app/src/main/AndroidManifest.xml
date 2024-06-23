@@ -5,7 +5,7 @@
     <uses-permission android:name= "android.permission.READ_MEDIA_AUDIO"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="aurora_music_v01"
+        android:label="Aurora Music (Alpha)"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
